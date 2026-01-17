@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    
+    <!-- Primary Meta Tags -->
+    <title>AnchorX - Bridge USDC to Bitcoin's DeFi</title>
+    <meta name="title" content="AnchorX - Bridge USDC to Bitcoin's DeFi" />
+    <meta name="description" content="The fastest, most secure way to bridge USDC between Ethereum and Stacks. Unlock Bitcoin-powered DeFi with Circle-backed stablecoins. Low fees, fast transfers, bank-grade security." />
+    <meta name="author" content="AnchorX" />
+    <meta name="keywords" content="USDC bridge, Ethereum to Stacks, Bitcoin DeFi, cross-chain bridge, cryptocurrency, stablecoin, USDCx, blockchain bridge" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0A0A0F" />
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://anchorx.app" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://anchorx.app" />
+    <meta property="og:title" content="AnchorX - Bridge USDC to Bitcoin's DeFi" />
+    <meta property="og:description" content="The fastest, most secure way to bridge USDC between Ethereum and Stacks. Unlock Bitcoin-powered DeFi with Circle-backed stablecoins." />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="AnchorX - Bridge USDC to Bitcoin's DeFi ecosystem" />
+    <meta property="og:site_name" content="AnchorX" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://anchorx.app" />
+    <meta name="twitter:title" content="AnchorX - Bridge USDC to Bitcoin's DeFi" />
+    <meta name="twitter:description" content="The fastest, most secure way to bridge USDC between Ethereum and Stacks. Unlock Bitcoin-powered DeFi with Circle-backed stablecoins." />
+    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:image:alt" content="AnchorX - Bridge USDC to Bitcoin's DeFi ecosystem" />
+    <meta name="twitter:site" content="@AnchorX" />
+    <meta name="twitter:creator" content="@AnchorX" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.ico" />
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://anchorx.app/#organization",
+            "name": "AnchorX",
+            "url": "https://anchorx.app",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://anchorx.app/og-image.png",
+              "width": 1200,
+              "height": 630
+            },
+            "sameAs": [
+              "https://twitter.com/AnchorX",
+              "https://github.com/AnchorX"
+            ],
+            "description": "The fastest, most secure way to bridge USDC between Ethereum and Stacks."
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://anchorx.app/#website",
+            "url": "https://anchorx.app",
+            "name": "AnchorX",
+            "publisher": {
+              "@id": "https://anchorx.app/#organization"
+            },
+            "description": "Bridge USDC to Bitcoin's DeFi ecosystem with AnchorX",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": "https://anchorx.app/faq?q={search_term_string}",
+              "query-input": "required name=search_term_string"
+            }
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://anchorx.app/#webapp",
+            "name": "AnchorX Bridge",
+            "url": "https://anchorx.app/bridge",
+            "applicationCategory": "FinanceApplication",
+            "operatingSystem": "Any",
+            "browserRequirements": "Requires JavaScript. Requires a Web3 wallet.",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD",
+              "description": "0.25% bridge fee per transaction"
+            },
+            "featureList": [
+              "Cross-chain USDC bridging",
+              "Ethereum to Stacks transfers",
+              "Real-time transaction tracking",
+              "Low 0.25% fees",
+              "Bank-grade security"
+            ],
+            "screenshot": "https://anchorx.app/og-image.png",
+            "author": {
+              "@id": "https://anchorx.app/#organization"
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": "https://anchorx.app/#breadcrumb",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://anchorx.app"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Bridge",
+                "item": "https://anchorx.app/bridge"
+              },
+              {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "How It Works",
+                "item": "https://anchorx.app/how-it-works"
+              },
+              {
+                "@type": "ListItem",
+                "position": 4,
+                "name": "FAQ",
+                "item": "https://anchorx.app/faq"
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
