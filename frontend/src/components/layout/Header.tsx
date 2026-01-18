@@ -1,16 +1,21 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useWallet } from '@/contexts/WalletContext';
-import { formatAddress } from '@/lib/mockData';
-import { Wallet, LogOut, Menu, X, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { formatAddress, formatAmount } from '@/lib/data';
+import { Wallet, LogOut, Menu, X, ChevronDown, Circle, Copy, Check, ExternalLink } from 'lucide-react';
+import { useState, memo, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
+import { ChainIcon } from '@/components/ui/ChainIcon';
+import { TokenIcon } from '@/components/ui/TokenIcon';
+import type { NetworkEnvironment } from '@/lib/constants/contracts';
 
 // Primary links shown directly in tablet nav
 const primaryLinks = [
@@ -29,9 +34,235 @@ const secondaryLinks = [
 // All links for desktop and mobile
 const navLinks = [...primaryLinks, ...secondaryLinks];
 
+// Memoized wallet dropdown to prevent infinite update loops from Radix UI
+interface WalletDropdownProps {
+  ethereumAddress: string | null;
+  stacksAddress: string | null;
+  usdcBalance: number;
+  usdcxBalance: number;
+  network: NetworkEnvironment;
+  onDisconnect: () => void;
+}
+
+const WalletDropdown = memo(function WalletDropdown({
+  ethereumAddress,
+  stacksAddress,
+  usdcBalance,
+  usdcxBalance,
+  network,
+  onDisconnect,
+}: WalletDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+
+  const copyToClipboard = useCallback(async (address: string) => {
+    await navigator.clipboard.writeText(address);
+    setCopiedAddress(address);
+    setTimeout(() => setCopiedAddress(null), 2000);
+  }, []);
+
+  const getExplorerUrl = useCallback((chain: 'ethereum' | 'stacks', address: string) => {
+    if (chain === 'ethereum') {
+      return network === 'mainnet' 
+        ? `https://etherscan.io/address/${address}`
+        : `https://sepolia.etherscan.io/address/${address}`;
+    }
+    return network === 'mainnet'
+      ? `https://explorer.hiro.so/address/${address}`
+      : `https://explorer.hiro.so/address/${address}?chain=testnet`;
+  }, [network]);
+
+  const handleDisconnect = useCallback(() => {
+    onDisconnect();
+    setIsOpen(false);
+  }, [onDisconnect]);
+
+  return (
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          className="hidden sm:flex items-center gap-2 glass px-3 py-2 h-auto hover:bg-muted/50"
+        >
+          {/* Network Badge */}
+          <span className={cn(
+            "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider",
+            network === 'mainnet' 
+              ? "bg-green-500/20 text-green-400 border border-green-500/30"
+              : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+          )}>
+            {network}
+          </span>
+          
+          {/* Wallet Icons */}
+          <div className="flex -space-x-1">
+            {ethereumAddress && (
+              <div className="h-6 w-6 rounded-full bg-ethereum/20 border-2 border-background flex items-center justify-center">
+                <ChainIcon chain="ethereum" className="h-3.5 w-3.5" />
+              </div>
+            )}
+            {stacksAddress && (
+              <div className="h-6 w-6 rounded-full bg-stacks/20 border-2 border-background flex items-center justify-center">
+                <ChainIcon chain="stacks" className="h-3.5 w-3.5" />
+              </div>
+            )}
+          </div>
+          
+          <ChevronDown className={cn(
+            "h-4 w-4 text-muted-foreground transition-transform",
+            isOpen && "rotate-180"
+          )} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 p-0 bg-popover/95 backdrop-blur-xl border-border">
+        {/* Network Header */}
+        <div className="px-4 py-3 border-b border-border/50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">Network</span>
+            <span className={cn(
+              "px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5",
+              network === 'mainnet' 
+                ? "bg-green-500/20 text-green-400"
+                : "bg-yellow-500/20 text-yellow-400"
+            )}>
+              <Circle className={cn(
+                "h-2 w-2 fill-current",
+                network === 'mainnet' ? "text-green-400" : "text-yellow-400"
+              )} />
+              {network === 'mainnet' ? 'Mainnet' : 'Testnet'}
+            </span>
+          </div>
+        </div>
+
+        {/* Ethereum Wallet */}
+        {ethereumAddress && (
+          <div className="p-4 border-b border-border/50">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-8 w-8 rounded-full bg-ethereum/20 flex items-center justify-center">
+                <ChainIcon chain="ethereum" className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-sm font-medium">Ethereum</div>
+                <div className="text-xs text-muted-foreground">
+                  {network === 'mainnet' ? 'Mainnet' : 'Sepolia'}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between bg-surface-1 rounded-lg px-3 py-2 mb-2">
+              <span className="font-mono text-sm">{formatAddress(ethereumAddress, 6, 4)}</span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => copyToClipboard(ethereumAddress)}
+                >
+                  {copiedAddress === ethereumAddress ? (
+                    <Check className="h-3.5 w-3.5 text-green-400" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+                <a
+                  href={getExplorerUrl('ethereum', ethereumAddress)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TokenIcon token="USDC" className="h-5 w-5" />
+                <span className="text-sm text-muted-foreground">USDC Balance</span>
+              </div>
+              <span className="font-semibold">${formatAmount(usdcBalance)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Stacks Wallet */}
+        {stacksAddress && (
+          <div className="p-4 border-b border-border/50">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-8 w-8 rounded-full bg-stacks/20 flex items-center justify-center">
+                <ChainIcon chain="stacks" className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-sm font-medium">Stacks</div>
+                <div className="text-xs text-muted-foreground">
+                  {network === 'mainnet' ? 'Mainnet' : 'Testnet'}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between bg-surface-1 rounded-lg px-3 py-2 mb-2">
+              <span className="font-mono text-sm">{formatAddress(stacksAddress, 6, 4)}</span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => copyToClipboard(stacksAddress)}
+                >
+                  {copiedAddress === stacksAddress ? (
+                    <Check className="h-3.5 w-3.5 text-green-400" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+                <a
+                  href={getExplorerUrl('stacks', stacksAddress)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TokenIcon token="USDCx" className="h-5 w-5" />
+                <span className="text-sm text-muted-foreground">USDCx Balance</span>
+              </div>
+              <span className="font-semibold">${formatAmount(usdcxBalance)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Total Balance */}
+        <div className="px-4 py-3 border-b border-border/50 bg-surface-1/50">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Total Balance</span>
+            <span className="font-bold text-lg">${formatAmount(usdcBalance + usdcxBalance)}</span>
+          </div>
+        </div>
+
+        {/* Disconnect Button */}
+        <div className="p-2">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={handleDisconnect}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Disconnect Wallets
+          </Button>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
 export function Header() {
   const location = useLocation();
-  const { wallet, isConnecting, connectWallet, disconnectWallet } = useWallet();
+  const { wallet, isConnecting, connectWallet, disconnectWallet, network } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreDropdownOpen, setMoreDropdownOpen] = useState(false);
 
@@ -46,8 +277,20 @@ export function Header() {
             data-onboarding="logo"
             aria-label="AnchorX - Go to homepage"
           >
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center" aria-hidden="true">
-              <span className="text-white font-bold text-sm">A</span>
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25" aria-hidden="true">
+              <svg viewBox="0 0 32 32" className="w-6 h-6" fill="none">
+                {/* Ethereum-inspired diamond top */}
+                <path d="M16 3 L22 12 L16 16 L10 12 Z" fill="white" opacity="0.9"/>
+                <path d="M16 16 L22 12 L16 10 L10 12 Z" fill="white" opacity="0.6"/>
+                {/* Stacks-inspired X bridge at bottom */}
+                <path d="M8 20 L24 20" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                <path d="M6 25 L26 25" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                {/* Connecting pillars */}
+                <path d="M11 20 L9 25" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+                <path d="M21 20 L23 25" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+                {/* Center bridge beam */}
+                <path d="M16 16 L16 20" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
             </div>
             <span className="text-xl font-bold gradient-text">AnchorX</span>
           </Link>
@@ -158,23 +401,14 @@ export function Header() {
           {/* Wallet Button */}
           <div className="flex items-center gap-3">
             {wallet.isConnected ? (
-              <div className="hidden sm:flex items-center gap-2">
-                <div 
-                  className="glass px-3 py-1.5 rounded-lg text-sm font-mono"
-                  aria-label={`Connected wallet: ${wallet.ethereumAddress}`}
-                >
-                  {formatAddress(wallet.ethereumAddress || '')}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={disconnectWallet}
-                  className="text-muted-foreground hover:text-destructive"
-                  aria-label="Disconnect wallet"
-                >
-                  <LogOut className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              </div>
+              <WalletDropdown
+                ethereumAddress={wallet.ethereumAddress}
+                stacksAddress={wallet.stacksAddress}
+                usdcBalance={wallet.usdcBalance}
+                usdcxBalance={wallet.usdcxBalance}
+                network={network}
+                onDisconnect={disconnectWallet}
+              />
             ) : (
               <Button
                 onClick={connectWallet}
@@ -233,26 +467,76 @@ export function Header() {
             {/* Mobile Wallet Section */}
             <div className="mt-4 pt-4 border-t border-border/50 px-4">
               {wallet.isConnected ? (
-                <div className="flex items-center justify-between">
-                  <div 
-                    className="glass px-3 py-1.5 rounded-lg text-sm font-mono"
-                    aria-label={`Connected wallet: ${wallet.ethereumAddress}`}
-                  >
-                    {formatAddress(wallet.ethereumAddress || '')}
+                <div className="space-y-4">
+                  {/* Network Badge */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Network</span>
+                    <span className={cn(
+                      "px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5",
+                      network === 'mainnet' 
+                        ? "bg-green-500/20 text-green-400"
+                        : "bg-yellow-500/20 text-yellow-400"
+                    )}>
+                      <Circle className={cn(
+                        "h-2 w-2 fill-current",
+                        network === 'mainnet' ? "text-green-400" : "text-yellow-400"
+                      )} />
+                      {network === 'mainnet' ? 'Mainnet' : 'Testnet'}
+                    </span>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      disconnectWallet();
-                      setMobileMenuOpen(false);
-                    }}
-                    className="text-destructive hover:text-destructive"
-                    aria-label="Disconnect wallet"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" aria-hidden="true" />
-                    Disconnect
-                  </Button>
+
+                  {/* Ethereum Wallet */}
+                  {wallet.ethereumAddress && (
+                    <div className="glass rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="h-6 w-6 rounded-full bg-ethereum/20 flex items-center justify-center">
+                          <ChainIcon chain="ethereum" className="h-4 w-4" />
+                        </div>
+                        <span className="text-sm font-medium">Ethereum</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-mono text-muted-foreground">{formatAddress(wallet.ethereumAddress, 6, 4)}</span>
+                        <span className="font-semibold">${formatAmount(wallet.usdcBalance)} USDC</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stacks Wallet */}
+                  {wallet.stacksAddress && (
+                    <div className="glass rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="h-6 w-6 rounded-full bg-stacks/20 flex items-center justify-center">
+                          <ChainIcon chain="stacks" className="h-4 w-4" />
+                        </div>
+                        <span className="text-sm font-medium">Stacks</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-mono text-muted-foreground">{formatAddress(wallet.stacksAddress, 6, 4)}</span>
+                        <span className="font-semibold">${formatAmount(wallet.usdcxBalance)} USDCx</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Total and Disconnect */}
+                  <div className="flex items-center justify-between pt-2">
+                    <div>
+                      <span className="text-xs text-muted-foreground">Total Balance</span>
+                      <div className="font-bold">${formatAmount(wallet.usdcBalance + wallet.usdcxBalance)}</div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        disconnectWallet();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="text-destructive hover:text-destructive"
+                      aria-label="Disconnect wallet"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" aria-hidden="true" />
+                      Disconnect
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <Button
