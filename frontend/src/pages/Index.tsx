@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -7,12 +8,13 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ParticleField } from '@/components/ui/ParticleField';
 import { TransactionTicker } from '@/components/ui/TransactionTicker';
 import { HeroChainVisualization } from '@/components/ui/HeroChainVisualization';
-import { bridgeStats, mockTransactions, formatAmount, getTimeAgo, networkStatus } from '@/lib/mockData';
+import { formatAmount, getTimeAgo, fetchBridgeStats, fetchNetworkStatus, type NetworkStatus, type BridgeStats } from '@/lib/data';
 import { ArrowRight, Shield, Zap, RefreshCw, Lock, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ChainIcon } from '@/components/ui/ChainIcon';
 import { cn } from '@/lib/utils';
 import { usePageMeta } from '@/hooks/usePageMeta';
+import { useWallet } from '@/contexts/WalletContext';
 
 const features = [
   {
@@ -48,7 +50,38 @@ export default function Index() {
     canonicalPath: '/',
   });
 
-  const recentTxs = mockTransactions.slice(0, 5);
+  const [bridgeStats, setBridgeStats] = useState<BridgeStats>({
+    totalValueBridged: 0,
+    totalTransactions: 0,
+    avgBridgeTime: 15,
+    activeUsers: 0,
+  });
+  const [networkStatus, setNetworkStatus] = useState<NetworkStatus[]>([]);
+  const { transactions } = useWallet();
+
+  // Fetch real stats and network status on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [stats, status] = await Promise.all([
+          fetchBridgeStats('testnet'),
+          fetchNetworkStatus('testnet'),
+        ]);
+        setBridgeStats(stats);
+        setNetworkStatus(status);
+      } catch (error) {
+        console.error('Failed to fetch bridge data:', error);
+      }
+    };
+    loadData();
+    
+    // Refresh every 60 seconds
+    const interval = setInterval(loadData, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Use real transactions from wallet context
+  const recentTxs = transactions.slice(0, 5);
 
   return (
     <Layout backgroundVariant="hero">
