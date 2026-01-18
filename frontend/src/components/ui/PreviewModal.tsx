@@ -1,10 +1,10 @@
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ChainIcon } from './ChainIcon';
 import { TokenIcon } from './TokenIcon';
 import { motion } from 'framer-motion';
 import { ArrowDown, Clock, Fuel, Percent, Loader2 } from 'lucide-react';
-import { formatAmount, feeStructure, calculateBridgeFee } from '@/lib/mockData';
+import { formatAmount, FEE_STRUCTURE, calculateBridgeFee } from '@/lib/data';
 
 interface PreviewModalProps {
   isOpen: boolean;
@@ -28,7 +28,7 @@ export function PreviewModal({
   const fromToken = fromChain === 'ethereum' ? 'USDC' : 'USDCx';
   const toToken = toChain === 'stacks' ? 'USDCx' : 'USDC';
   const bridgeFee = calculateBridgeFee(amount);
-  const gasFee = feeStructure.estimatedGasFee[fromChain];
+  const gasFee = FEE_STRUCTURE.estimatedGasFee[fromChain];
   const receiveAmount = amount - bridgeFee;
   const estimatedTime = fromChain === 'ethereum' ? '~12 minutes' : '~8 minutes';
 
@@ -38,6 +38,9 @@ export function PreviewModal({
         <DialogTitle className="text-lg sm:text-xl font-bold text-center">
           Confirm Bridge
         </DialogTitle>
+        <DialogDescription className="sr-only">
+          Review and confirm your bridge transaction details
+        </DialogDescription>
 
         <div className="space-y-4 sm:space-y-6 pt-2 sm:pt-4">
           {/* From Section */}
@@ -110,7 +113,7 @@ export function PreviewModal({
             <div className="flex items-center justify-between text-xs sm:text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Percent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span>Bridge Fee ({feeStructure.bridgeFeePercent}%)</span>
+                <span>Bridge Fee ({FEE_STRUCTURE.bridgeFeePercent}%)</span>
               </div>
               <span className="font-mono">${formatAmount(bridgeFee)}</span>
             </div>

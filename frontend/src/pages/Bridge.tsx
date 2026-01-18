@@ -10,13 +10,24 @@ import { SuccessModal } from '@/components/ui/SuccessModal';
 import { BridgeTimeline, BridgeStep } from '@/components/ui/BridgeTimeline';
 import { Input } from '@/components/ui/input';
 import { useWallet } from '@/contexts/WalletContext';
-import { formatAmount, calculateBridgeFee, feeStructure } from '@/lib/mockData';
+import { formatAmount, calculateBridgeFee, feeStructure } from '@/lib/data';
 import { ArrowDownUp, Wallet, ChevronDown, Info, Loader2, UserPlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { usePreferences } from '@/hooks/usePreferences';
+
+// Import bridge services
+import { 
+  executeDeposit, 
+  executeWithdraw,
+  saveBridgeTransaction,
+  getMinWithdrawAmount,
+  type DepositProgress,
+  type WithdrawProgress,
+  type BridgeTransaction,
+} from '@/lib/bridge';
 
 type Direction = 'deposit' | 'withdraw';
 
@@ -27,7 +38,7 @@ export default function Bridge() {
     canonicalPath: '/bridge',
   });
 
-  const { wallet, connectWallet, isConnecting, addTransaction } = useWallet();
+  const { wallet, connectWallet, isConnecting, addTransaction, network, refreshBalances } = useWallet();
   const { preferences, isLoaded, updateBridgePreferences } = usePreferences();
   
   const [direction, setDirection] = useState<Direction>('deposit');
@@ -40,6 +51,7 @@ export default function Bridge() {
   const [bridgeStep, setBridgeStep] = useState<BridgeStep>('idle');
   const [confirmations, setConfirmations] = useState(0);
   const [lastTxHash, setLastTxHash] = useState('');
+  const [lastBridgedAmount, setLastBridgedAmount] = useState(0); // Track the amount that was actually bridged
   const [showRecipient, setShowRecipient] = useState(false);
   const [recipientAddress, setRecipientAddress] = useState('');
 
@@ -133,62 +145,191 @@ export default function Bridge() {
     setShowPreview(false);
     setBridgeStep('initiated');
     
-    // Generate fake tx hash
-    const txHash = `0x${Array.from({ length: 64 }, () => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('')}`;
-    setLastTxHash(txHash);
-
-    // Simulate initiated → confirming
-    await new Promise(r => setTimeout(r, 1500));
-    setBridgeStep('confirming');
-
-    // Simulate confirmations
-    const requiredConfs = isDeposit ? 12 : 6;
-    for (let i = 1; i <= requiredConfs; i++) {
-      await new Promise(r => setTimeout(r, 300));
-      setConfirmations(i);
-    }
-
-    // Simulate bridging
-    await new Promise(r => setTimeout(r, 500));
-    setBridgeStep('bridging');
-    await new Promise(r => setTimeout(r, 2000));
-
-    // Complete
-    setBridgeStep('completed');
-    
     // Determine recipient
     const destinationAddress = showRecipient && recipientAddress 
       ? recipientAddress 
       : (toChain === 'stacks' ? wallet.stacksAddress : wallet.ethereumAddress) || '';
 
-    // Add transaction
-    addTransaction({
-      type: isDeposit ? 'deposit' : 'withdraw',
-      amount: numAmount,
-      status: 'completed',
-      fromChain,
-      toChain,
-      fromAddress: (fromChain === 'ethereum' ? wallet.ethereumAddress : wallet.stacksAddress) || '',
-      toAddress: destinationAddress,
-      txHash,
-      confirmations: requiredConfs,
-      requiredConfirmations: requiredConfs,
-      fee: numAmount * 0.0025,
-      gasFee: feeStructure.estimatedGasFee[fromChain],
-    });
+    // Real blockchain bridge
+    try {
+      if (isDeposit) {
+          // Deposit: ETH → STX (USDC → USDCx)
+          if (!wallet.ethereumAddress || !wallet.stacksAddress) {
+            throw new Error('Both wallets must be connected');
+          }
 
-    toast.success('Bridge completed!', {
-      description: `Successfully bridged ${formatAmount(numAmount)} ${fromToken.toUpperCase()}`,
-    });
+          const result = await executeDeposit(
+            {
+              amount: amount,
+              stacksRecipient: destinationAddress || wallet.stacksAddress,
+              ethereumSender: wallet.ethereumAddress as `0x${string}`,
+              network: network,
+            },
+            (progress: DepositProgress) => {
+              // Map deposit steps to bridge timeline steps
+              switch (progress.step) {
+                case 'checking-allowance':
+                case 'approving':
+                  setBridgeStep('initiated');
+                  break;
+                case 'waiting-approval':
+                  setBridgeStep('confirming');
+                  setConfirmations(3);
+                  break;
+                case 'depositing':
+                  setBridgeStep('confirming');
+                  setConfirmations(8);
+                  break;
+                case 'waiting-deposit':
+                  setBridgeStep('bridging');
+                  setConfirmations(12);
+                  break;
+                case 'completed':
+                  setBridgeStep('completed');
+                  break;
+                case 'error':
+                  throw new Error(progress.error);
+              }
+              if (progress.depositTxHash) {
+                setLastTxHash(progress.depositTxHash);
+              }
+            }
+          );
 
-    await new Promise(r => setTimeout(r, 500));
-    setIsBridging(false);
-    setBridgeStep('idle');
-    setConfirmations(0);
-    setShowSuccess(true);
-    setAmount('');
+          setLastTxHash(result.depositTxHash);
+          
+          // Create transaction record
+          const txRecord: BridgeTransaction = {
+            id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            direction: 'deposit',
+            amount: amount,
+            status: 'completed',
+            fromAddress: wallet.ethereumAddress!,
+            toAddress: destinationAddress || wallet.stacksAddress!,
+            txHash: result.depositTxHash,
+            sourceTxHash: result.depositTxHash,
+            timestamp: Date.now(),
+            network: network,
+          };
+          
+          // Save to localStorage for persistence
+          saveBridgeTransaction(txRecord);
+          
+          // Add to context state
+          addTransaction({
+            type: 'deposit',
+            amount: numAmount,
+            status: 'completed',
+            fromChain,
+            toChain,
+            fromAddress: wallet.ethereumAddress,
+            toAddress: destinationAddress || wallet.stacksAddress,
+            txHash: result.depositTxHash,
+            confirmations: 12,
+            requiredConfirmations: 12,
+            fee: numAmount * 0.0025,
+            gasFee: feeStructure.estimatedGasFee[fromChain],
+          });
+
+        } else {
+          // Withdraw: STX → ETH (USDCx → USDC)
+          if (!wallet.stacksAddress || !wallet.ethereumAddress) {
+            throw new Error('Both wallets must be connected');
+          }
+
+          const result = await executeWithdraw(
+            {
+              amount: amount,
+              ethereumRecipient: (destinationAddress || wallet.ethereumAddress) as `0x${string}`,
+              stacksSender: wallet.stacksAddress,
+              network: network,
+            },
+            (progress: WithdrawProgress) => {
+              switch (progress.step) {
+                case 'preparing':
+                  setBridgeStep('initiated');
+                  break;
+                case 'signing':
+                  setBridgeStep('confirming');
+                  setConfirmations(2);
+                  break;
+                case 'broadcasting':
+                case 'pending':
+                  setBridgeStep('bridging');
+                  setConfirmations(6);
+                  break;
+                case 'completed':
+                  setBridgeStep('completed');
+                  break;
+                case 'error':
+                  throw new Error(progress.error);
+              }
+              if (progress.txId) {
+                setLastTxHash(progress.txId);
+              }
+            }
+          );
+
+          setLastTxHash(result.txId);
+
+          // Create transaction record for withdraw
+          const withdrawTxRecord: BridgeTransaction = {
+            id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            direction: 'withdraw',
+            amount: amount,
+            status: 'processing',
+            fromAddress: wallet.stacksAddress!,
+            toAddress: destinationAddress || wallet.ethereumAddress!,
+            txHash: result.txId,
+            sourceTxHash: result.txId,
+            timestamp: Date.now(),
+            network: network,
+          };
+          
+          // Save to localStorage for persistence
+          saveBridgeTransaction(withdrawTxRecord);
+
+          // Add transaction record to context
+          addTransaction({
+            type: 'withdraw',
+            amount: numAmount,
+            status: 'processing', // Withdraw takes longer
+            fromChain,
+            toChain,
+            fromAddress: wallet.stacksAddress,
+            toAddress: destinationAddress || wallet.ethereumAddress,
+            txHash: result.txId,
+            confirmations: 6,
+            requiredConfirmations: 6,
+            fee: numAmount * 0.0025,
+            gasFee: feeStructure.estimatedGasFee[fromChain],
+          });
+        }
+
+        setBridgeStep('completed');
+        
+        toast.success('Bridge initiated!', {
+          description: `Your ${fromToken.toUpperCase()} is being bridged to ${toChain === 'stacks' ? 'Stacks' : 'Ethereum'}. This may take ${isDeposit ? '10-30' : '20-60'} minutes.`,
+        });
+
+        // Refresh balances
+        await refreshBalances();
+
+        await new Promise(r => setTimeout(r, 1000));
+        setLastBridgedAmount(numAmount); // Store the bridged amount before clearing input
+        setShowSuccess(true);
+        setAmount('');
+
+      } catch (error: any) {
+        console.error('Bridge error:', error);
+        toast.error('Bridge failed', {
+          description: error.message || 'Transaction was cancelled or failed',
+        });
+        setBridgeStep('idle');
+      } finally {
+        setIsBridging(false);
+        setConfirmations(0);
+      }
   };
 
   const canBridge = wallet.isConnected && numAmount > 0 && numAmount <= balance && recipientValid;
@@ -244,9 +385,16 @@ export default function Bridge() {
                   <div className="flex items-center justify-between flex-wrap gap-1">
                     <span className="text-xs text-muted-foreground">From</span>
                     {wallet.isConnected && (
-                      <span className="text-xs text-muted-foreground">
-                        Balance: <span className="font-mono">{formatAmount(balance)}</span> {fromToken.toUpperCase()}
-                      </span>
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-xs text-muted-foreground">
+                          Balance: <span className="font-mono">{formatAmount(balance)}</span> {fromToken.toUpperCase()}
+                        </span>
+                        {direction === 'withdraw' && (
+                          <span className="text-[10px] text-amber-500/80">
+                            Min withdrawal: $4.80 USDCx
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -485,7 +633,7 @@ export default function Bridge() {
       <SuccessModal
         isOpen={showSuccess}
         onClose={() => setShowSuccess(false)}
-        amount={numAmount || 1000}
+        amount={lastBridgedAmount}
         fromChain={fromChain}
         toChain={toChain}
         txHash={lastTxHash || '0x8f4d2c1a3b5e6f7d8c9b0a1e2f3d4c5b6a7e8f9d0c1b2a3e4f5d6c7b8a9e0f1'}

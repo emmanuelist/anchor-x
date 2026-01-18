@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Copy, Check, ExternalLink } from 'lucide-react';
-import { formatAddress } from '@/lib/mockData';
+import { formatAddress } from '@/lib/data';
 import { toast } from 'sonner';
 
 interface AddressDisplayProps {

@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Check, Loader2, Circle, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { Transaction, TransactionStep } from '@/lib/mockData';
+import type { Transaction, TransactionStep } from '@/lib/data';
 import { format } from 'date-fns';
 
 interface TransactionDetailTimelineProps {

@@ -9,7 +9,7 @@ import { TransactionsSkeleton } from '@/components/ui/TransactionsSkeleton';
 import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useWallet } from '@/contexts/WalletContext';
-import { formatAmount, getTimeAgo, getExplorerUrl } from '@/lib/mockData';
+import { formatAmount, getTimeAgo, getExplorerUrl } from '@/lib/data';
 import { Search, ArrowRight, ExternalLink, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';

@@ -12,7 +12,7 @@ import { Sparkline } from '@/components/ui/Sparkline';
 import { PortfolioChart } from '@/components/ui/PortfolioChart';
 import { DashboardSkeleton } from '@/components/ui/DashboardSkeleton';
 import { useWallet } from '@/contexts/WalletContext';
-import { formatAmount, getTimeAgo, networkStatus, sparklineData, getPercentageChange } from '@/lib/mockData';
+import { formatAmount, getTimeAgo, fetchNetworkStatus, type NetworkStatus } from '@/lib/data';
 import { ArrowUpRight, ArrowDownLeft, Wallet, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { usePageMeta } from '@/hooks/usePageMeta';
@@ -26,6 +26,42 @@ export default function Dashboard() {
 
   const { wallet, transactions, connectWallet, isConnecting } = useWallet();
   const [isLoading, setIsLoading] = useState(true);
+  const [networkStatus, setNetworkStatus] = useState<NetworkStatus[]>([]);
+  
+  // Generate sparkline data from balance history (simulated from current balance)
+  // In production, this would come from historical balance tracking
+  const [sparklineData, setSparklineData] = useState({
+    usdc: [100, 100, 100, 100, 100, 100, 100, 100],
+    usdcx: [100, 100, 100, 100, 100, 100, 100, 100],
+  });
+
+  // Fetch network status
+  useEffect(() => {
+    const loadNetworkStatus = async () => {
+      try {
+        const status = await fetchNetworkStatus('testnet');
+        setNetworkStatus(status);
+      } catch (error) {
+        console.error('Failed to fetch network status:', error);
+      }
+    };
+    loadNetworkStatus();
+    const interval = setInterval(loadNetworkStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Update sparkline data when balance changes
+  useEffect(() => {
+    if (wallet.isConnected) {
+      // Create sparkline based on current balance (normalized to show variation)
+      const baseUsdc = wallet.usdcBalance || 100;
+      const baseUsdcx = wallet.usdcxBalance || 100;
+      setSparklineData({
+        usdc: Array(8).fill(0).map((_, i) => baseUsdc * (0.95 + Math.random() * 0.1)),
+        usdcx: Array(8).fill(0).map((_, i) => baseUsdcx * (0.95 + Math.random() * 0.1)),
+      });
+    }
+  }, [wallet.usdcBalance, wallet.usdcxBalance, wallet.isConnected]);
 
   // Simulate loading state
   useEffect(() => {
@@ -41,8 +77,13 @@ export default function Dashboard() {
     tx.fromAddress === wallet.ethereumAddress || tx.fromAddress === wallet.stacksAddress
   ).slice(0, 5);
 
-  const usdcChange = getPercentageChange(sparklineData.usdc);
-  const usdcxChange = getPercentageChange(sparklineData.usdcx);
+  // Calculate percentage change from first to last value in sparkline
+  const calculateChange = (data: number[]) => {
+    if (data.length < 2 || data[0] === 0) return 0;
+    return ((data[data.length - 1] - data[0]) / data[0]) * 100;
+  };
+  const usdcChange = calculateChange(sparklineData.usdc);
+  const usdcxChange = calculateChange(sparklineData.usdcx);
 
   if (!wallet.isConnected) {
     return (
