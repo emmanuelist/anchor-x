@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ConfettiCelebration } from './ConfettiCelebration';
 import { AddressDisplay } from './AddressDisplay';
@@ -6,7 +6,7 @@ import { ChainIcon } from './ChainIcon';
 import { motion } from 'framer-motion';
 import { Check, ExternalLink, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { formatAmount, getExplorerUrl } from '@/lib/mockData';
+import { formatAmount, getExplorerUrl } from '@/lib/data';
 
 interface SuccessModalProps {
   isOpen: boolean;
@@ -34,6 +34,9 @@ export function SuccessModal({
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto glass-strong border-success/30">
           <DialogTitle className="sr-only">Bridge Transaction Successful</DialogTitle>
+          <DialogDescription className="sr-only">
+            Your bridge transaction has completed successfully
+          </DialogDescription>
           <div className="flex flex-col items-center text-center pt-2 sm:pt-4">
             {/* Success Checkmark */}
             <motion.div
