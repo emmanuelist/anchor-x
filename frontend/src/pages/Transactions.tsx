@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useWallet } from '@/contexts/WalletContext';
 import { formatAmount, getTimeAgo, getExplorerUrl } from '@/lib/data';
 import { syncFromBlockchain } from '@/lib/bridge';
-import { Search, ArrowRight, ExternalLink, ChevronDown, RefreshCw, Loader2 } from 'lucide-react';
+import { Search, ArrowRight, ExternalLink, ChevronDown, RefreshCw, Loader2, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { usePageMeta } from '@/hooks/usePageMeta';
@@ -70,7 +70,8 @@ export default function Transactions() {
     }
   }, [ethAddress, stxAddress, refreshTransactions]);
 
-  const filtered = transactions.filter((tx) => {
+  // Filter transactions
+  const filteredTransactions = transactions.filter((tx) => {
     if (typeFilter !== 'all' && tx.type !== typeFilter) return false;
     if (statusFilter !== 'all' && tx.status !== statusFilter) return false;
     if (search) {
@@ -83,6 +84,44 @@ export default function Transactions() {
     }
     return true;
   });
+
+  // Export transactions to CSV
+  const handleExportCSV = useCallback(() => {
+    if (filteredTransactions.length === 0) {
+      toast.error('No transactions to export');
+      return;
+    }
+
+    const headers = ['Date', 'Type', 'Amount', 'Token', 'Status', 'From', 'To', 'Tx Hash', 'Fee'];
+    const rows = filteredTransactions.map(tx => [
+      new Date(tx.timestamp).toISOString(),
+      tx.type,
+      tx.amount.toString(),
+      tx.type === 'deposit' ? 'USDC→USDCx' : 'USDCx→USDC',
+      tx.status,
+      tx.fromAddress,
+      tx.toAddress,
+      tx.txHash,
+      tx.fee?.toString() || '0',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `anchorx-transactions-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Exported ${filteredTransactions.length} transaction${filteredTransactions.length !== 1 ? 's' : ''} to CSV`);
+  }, [filteredTransactions]);
 
   // Show skeleton while loading
   if (isLoading) {
@@ -104,24 +143,43 @@ export default function Transactions() {
         >
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Transactions</h1>
-            <button
-              onClick={handleSyncFromBlockchain}
-              disabled={isSyncing || (!ethAddress && !stxAddress)}
-              className={cn(
-                'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all',
-                'bg-surface-2 hover:bg-surface-3 text-muted-foreground hover:text-foreground',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
-              )}
-              title="Sync transaction history from blockchain"
-            >
-              {isSyncing ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )}
-              <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync from Blockchain'}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Export CSV Button */}
+              <button
+                onClick={handleExportCSV}
+                disabled={filteredTransactions.length === 0}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all',
+                  'bg-surface-2 hover:bg-surface-3 text-muted-foreground hover:text-foreground',
+                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+                )}
+                title="Export transactions to CSV"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+              
+              {/* Sync from Blockchain Button */}
+              <button
+                onClick={handleSyncFromBlockchain}
+                disabled={isSyncing || (!ethAddress && !stxAddress)}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all',
+                  'bg-surface-2 hover:bg-surface-3 text-muted-foreground hover:text-foreground',
+                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+                )}
+                title="Sync transaction history from blockchain"
+              >
+                {isSyncing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Filters */}
@@ -187,15 +245,15 @@ export default function Transactions() {
           <div 
             className="space-y-2.5 sm:space-y-3" 
             role="list" 
-            aria-label={`${filtered.length} transaction${filtered.length !== 1 ? 's' : ''} found`}
+            aria-label={`${filteredTransactions.length} transaction${filteredTransactions.length !== 1 ? 's' : ''} found`}
             aria-live="polite"
           >
-            {filtered.length === 0 ? (
+            {filteredTransactions.length === 0 ? (
               <GlowCard className="text-center py-8 sm:py-10" hover={false} role="status">
                 <p className="text-muted-foreground text-sm">No transactions found</p>
               </GlowCard>
             ) : (
-              filtered.map((tx, i) => (
+              filteredTransactions.map((tx, i) => (
                 <motion.div
                   key={tx.id}
                   initial={{ opacity: 0, y: 10 }}
