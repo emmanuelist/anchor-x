@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useWallet } from '@/contexts/WalletContext';
 import { formatAddress, formatAmount } from '@/lib/data';
 import { Wallet, LogOut, Menu, X, ChevronDown, Circle, Copy, Check, ExternalLink } from 'lucide-react';
-import { useState, memo, useCallback } from 'react';
+import { useState, memo, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ChainIcon } from '@/components/ui/ChainIcon';
 import { TokenIcon } from '@/components/ui/TokenIcon';
+import { WalletModal } from '@/components/ui/WalletModal';
+import { useAppKit } from '@reown/appkit/react';
 import type { NetworkEnvironment } from '@/lib/constants/contracts';
 
 // Primary links shown directly in tablet nav
@@ -43,6 +45,8 @@ interface WalletDropdownProps {
   usdcxBalance: number;
   network: NetworkEnvironment;
   onDisconnect: () => void;
+  onConnectEthereum?: () => void;
+  onConnectStacks?: () => void;
 }
 
 const WalletDropdown = memo(function WalletDropdown({
@@ -52,6 +56,8 @@ const WalletDropdown = memo(function WalletDropdown({
   usdcxBalance,
   network,
   onDisconnect,
+  onConnectEthereum,
+  onConnectStacks,
 }: WalletDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
@@ -178,7 +184,7 @@ const WalletDropdown = memo(function WalletDropdown({
             
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <TokenIcon token="USDC" className="h-5 w-5" />
+                <TokenIcon token="usdc" className="h-5 w-5" />
                 <span className="text-sm text-muted-foreground">USDC Balance</span>
               </div>
               <span className="font-semibold">${formatAmount(usdcBalance)}</span>
@@ -229,10 +235,55 @@ const WalletDropdown = memo(function WalletDropdown({
             
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <TokenIcon token="USDCx" className="h-5 w-5" />
+                <TokenIcon token="usdcx" className="h-5 w-5" />
                 <span className="text-sm text-muted-foreground">USDCx Balance</span>
               </div>
               <span className="font-semibold">${formatAmount(usdcxBalance)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Connect Missing Wallet Section */}
+        {(!ethereumAddress || !stacksAddress) && (
+          <div className="p-3 border-b border-border/50">
+            <p className="text-xs text-muted-foreground mb-2">
+              {!ethereumAddress && !stacksAddress 
+                ? 'Connect wallets to start bridging'
+                : 'Connect both wallets to bridge between chains'}
+            </p>
+            <div className="space-y-2">
+              {!ethereumAddress && onConnectEthereum && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start gap-2 border-ethereum/30 hover:bg-ethereum/10 hover:border-ethereum/50"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onConnectEthereum();
+                  }}
+                >
+                  <div className="h-6 w-6 rounded-full bg-ethereum/20 flex items-center justify-center">
+                    <ChainIcon chain="ethereum" className="h-4 w-4" />
+                  </div>
+                  <span>Connect Ethereum Wallet</span>
+                </Button>
+              )}
+              {!stacksAddress && onConnectStacks && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start gap-2 border-stacks/30 hover:bg-stacks/10 hover:border-stacks/50"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onConnectStacks();
+                  }}
+                >
+                  <div className="h-6 w-6 rounded-full bg-stacks/20 flex items-center justify-center">
+                    <ChainIcon chain="stacks" className="h-4 w-4" />
+                  </div>
+                  <span>Connect Stacks Wallet</span>
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -319,10 +370,89 @@ const MoreDropdown = memo(function MoreDropdown({ currentPath }: MoreDropdownPro
 
 export function Header() {
   const location = useLocation();
-  const { wallet, isConnecting, connectWallet, disconnectWallet, network } = useWallet();
+  const { 
+    wallet, 
+    isConnecting, 
+    connectWallet, 
+    connectEthereumOnly,
+    connectStacksOnly,
+    connectEthereumWithWallet,
+    disconnectWallet, 
+    network 
+  } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [ethWalletModalOpen, setEthWalletModalOpen] = useState(false);
+  const [stxWalletModalOpen, setStxWalletModalOpen] = useState(false);
+  const [chainSelectorOpen, setChainSelectorOpen] = useState(false);
+  
+  // Track if we're in "connect both" mode - after ETH connects, auto-open Stacks
+  const [pendingStacksConnection, setPendingStacksConnection] = useState(false);
+  const prevEthAddressRef = useRef<string | null>(null);
+
+  // AppKit hook for opening the Ethereum wallet modal
+  const { open: openAppKit } = useAppKit();
+
+  // Effect: When Ethereum connects and we're in "connect both" mode, open Stacks modal
+  useEffect(() => {
+    // Check if Ethereum just connected (wasn't connected before, now is)
+    const ethJustConnected = wallet.ethereumAddress && !prevEthAddressRef.current;
+    prevEthAddressRef.current = wallet.ethereumAddress;
+
+    if (ethJustConnected && pendingStacksConnection && !wallet.stacksAddress) {
+      // Ethereum connected, now open Stacks modal
+      setPendingStacksConnection(false);
+      // Small delay to let AppKit modal close
+      setTimeout(() => {
+        setStxWalletModalOpen(true);
+      }, 500);
+    }
+  }, [wallet.ethereumAddress, wallet.stacksAddress, pendingStacksConnection]);
+
+  // Handle Ethereum wallet selection - use AppKit modal
+  const handleSelectEthWallet = async (walletId: string) => {
+    setChainSelectorOpen(false);
+    if (connectEthereumWithWallet) {
+      await connectEthereumWithWallet(walletId);
+    } else {
+      await connectEthereumOnly();
+    }
+  };
+
+  // Handle Stacks wallet selection
+  const handleSelectStxWallet = async (walletId: string) => {
+    setChainSelectorOpen(false);
+    await connectStacksOnly();
+  };
+
+  // Open chain selector when Connect Wallet is clicked
+  const handleConnectClick = () => {
+    setChainSelectorOpen(true);
+  };
+
+  // Select Ethereum - opens AppKit modal (like Hermes)
+  const handleSelectEthereum = () => {
+    setChainSelectorOpen(false);
+    // Open AppKit modal for beautiful wallet selection UX
+    openAppKit();
+  };
+
+  // Select Stacks - opens wallet modal
+  const handleSelectStacks = () => {
+    setChainSelectorOpen(false);
+    setStxWalletModalOpen(true);
+  };
+
+  // Connect both chains - opens AppKit for ETH first, then Stacks after ETH connects
+  const handleConnectBoth = async () => {
+    setChainSelectorOpen(false);
+    // Set flag to open Stacks modal after Ethereum connects
+    setPendingStacksConnection(true);
+    // Open AppKit for Ethereum first
+    openAppKit();
+  };
 
   return (
+    <>
     <header className="sticky top-0 z-50 glass-strong" role="banner">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
@@ -435,18 +565,73 @@ export function Header() {
                 usdcxBalance={wallet.usdcxBalance}
                 network={network}
                 onDisconnect={disconnectWallet}
+                onConnectEthereum={handleSelectEthereum}
+                onConnectStacks={handleSelectStacks}
               />
             ) : (
-              <Button
-                onClick={connectWallet}
-                disabled={isConnecting}
-                data-onboarding="connect-wallet"
-                className="hidden sm:flex bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
-                aria-label={isConnecting ? 'Connecting wallet...' : 'Connect your cryptocurrency wallet'}
-              >
-                <Wallet className="h-4 w-4 mr-2" aria-hidden="true" />
-                {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-              </Button>
+              /* Chain selector dropdown - opens on Connect Wallet click */
+              <DropdownMenu open={chainSelectorOpen} onOpenChange={setChainSelectorOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    disabled={isConnecting}
+                    data-onboarding="connect-wallet"
+                    className="hidden sm:flex bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
+                    aria-label={isConnecting ? 'Connecting wallet...' : 'Connect your cryptocurrency wallet'}
+                  >
+                    <Wallet className="h-4 w-4 mr-2" />
+                    {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 bg-popover border-border p-2">
+                  <DropdownMenuLabel className="text-xs text-muted-foreground px-2">
+                    Choose a chain to connect
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={handleSelectEthereum}
+                    className="cursor-pointer p-2 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="w-10 h-10 rounded-full bg-[#627EEA]/20 flex items-center justify-center">
+                        <ChainIcon chain="ethereum" className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <div className="font-medium">Ethereum</div>
+                        <div className="text-xs text-muted-foreground">MetaMask, Rabby, OKX...</div>
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleSelectStacks}
+                    className="cursor-pointer p-2 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="w-10 h-10 rounded-full bg-[#5546FF]/20 flex items-center justify-center">
+                        <ChainIcon chain="stacks" className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <div className="font-medium">Stacks</div>
+                        <div className="text-xs text-muted-foreground">Leather, Xverse</div>
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={handleConnectBoth}
+                    className="cursor-pointer p-2 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#627EEA]/20 to-[#5546FF]/20 flex items-center justify-center">
+                        <Wallet className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="font-medium">Connect Both</div>
+                        <div className="text-xs text-muted-foreground">ETH + STX wallets</div>
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
 
             {/* Mobile menu button */}
@@ -544,6 +729,49 @@ export function Header() {
                     </div>
                   )}
 
+                  {/* Connect Missing Wallet - Mobile */}
+                  {(!wallet.ethereumAddress || !wallet.stacksAddress) && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        {!wallet.ethereumAddress && !wallet.stacksAddress 
+                          ? 'Connect wallets to start bridging'
+                          : 'Connect both wallets to bridge'}
+                      </p>
+                      {!wallet.ethereumAddress && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start gap-2 border-ethereum/30 hover:bg-ethereum/10"
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            handleSelectEthereum();
+                          }}
+                        >
+                          <div className="h-5 w-5 rounded-full bg-ethereum/20 flex items-center justify-center">
+                            <ChainIcon chain="ethereum" className="h-3 w-3" />
+                          </div>
+                          <span>Connect Ethereum</span>
+                        </Button>
+                      )}
+                      {!wallet.stacksAddress && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start gap-2 border-stacks/30 hover:bg-stacks/10"
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            handleSelectStacks();
+                          }}
+                        >
+                          <div className="h-5 w-5 rounded-full bg-stacks/20 flex items-center justify-center">
+                            <ChainIcon chain="stacks" className="h-3 w-3" />
+                          </div>
+                          <span>Connect Stacks</span>
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Total and Disconnect */}
                   <div className="flex items-center justify-between pt-2">
                     <div>
@@ -568,8 +796,8 @@ export function Header() {
               ) : (
                 <Button
                   onClick={() => {
-                    connectWallet();
                     setMobileMenuOpen(false);
+                    setChainSelectorOpen(true);
                   }}
                   disabled={isConnecting}
                   className="w-full bg-gradient-to-r from-primary to-accent"
@@ -584,5 +812,20 @@ export function Header() {
         )}
       </div>
     </header>
+
+    {/* Wallet Selection Modals */}
+    <WalletModal
+      isOpen={ethWalletModalOpen}
+      onClose={() => setEthWalletModalOpen(false)}
+      onSelectWallet={handleSelectEthWallet}
+      chain="ethereum"
+    />
+    <WalletModal
+      isOpen={stxWalletModalOpen}
+      onClose={() => setStxWalletModalOpen(false)}
+      onSelectWallet={handleSelectStxWallet}
+      chain="stacks"
+    />
+    </>
   );
 }
