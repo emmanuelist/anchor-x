@@ -23,7 +23,11 @@ import {
   fetchETHBalance,
   isEthereumWalletConnected,
   getConnectedEthereumAddress,
+  connectSpecificWallet,
 } from '@/lib/ethereum/wallet';
+
+// AppKit hooks for Ethereum wallet state
+import { useAppKitAccount, useDisconnect } from '@reown/appkit/react';
 
 import { getBridgeTransactions, syncTransactionStatuses, backfillGasFees, type BridgeTransaction } from '@/lib/bridge';
 import type { NetworkEnvironment } from '@/lib/constants/contracts';
@@ -36,6 +40,7 @@ interface WalletContextType {
   connectWallet: () => Promise<void>;
   connectStacksOnly: () => Promise<void>;
   connectEthereumOnly: () => Promise<void>;
+  connectEthereumWithWallet: (walletId: string) => Promise<void>;
   disconnectWallet: () => void;
   addTransaction: (tx: Omit<Transaction, 'id' | 'timestamp'>) => void;
   updateBalance: (chain: 'ethereum' | 'stacks', amount: number) => void;
@@ -51,9 +56,73 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [network] = useState<NetworkEnvironment>('testnet');
 
+  // AppKit state - syncs with wagmi/appkit for Ethereum
+  const { address: appKitAddress, isConnected: appKitConnected } = useAppKitAccount();
+  const { disconnect: disconnectAppKit } = useDisconnect();
+
   // Use ref to access current wallet state without causing dependency changes
   const walletRef = useRef(wallet);
   walletRef.current = wallet;
+
+  // Track previous AppKit address to prevent unnecessary updates
+  const prevAppKitAddressRef = useRef<string | undefined>(undefined);
+
+  // Sync AppKit Ethereum connection with our wallet state
+  useEffect(() => {
+    // Skip if address hasn't actually changed
+    if (prevAppKitAddressRef.current === appKitAddress) {
+      return;
+    }
+    const wasConnected = !!prevAppKitAddressRef.current;
+    prevAppKitAddressRef.current = appKitAddress;
+
+    if (appKitConnected && appKitAddress) {
+      console.log('AppKit connected:', appKitAddress);
+      
+      // Update wallet state with AppKit address
+      setWallet(prev => {
+        // Only update if address changed
+        if (prev.ethereumAddress === appKitAddress) return prev;
+        return {
+          ...prev,
+          isConnected: true,
+          ethereumAddress: appKitAddress,
+        };
+      });
+
+      // Fetch USDC balance and show toast
+      fetchUSDCBalance(appKitAddress, network)
+        .then(balance => {
+          const formatted = Number(balance) / 1_000_000;
+          setWallet(prev => ({
+            ...prev,
+            usdcBalance: formatted,
+          }));
+          console.log('USDC balance:', formatted);
+          
+          // Show success toast with balance (only for new connections)
+          if (!wasConnected) {
+            const shortAddress = `${appKitAddress.slice(0, 6)}...${appKitAddress.slice(-4)}`;
+            toast.success('Ethereum wallet connected', {
+              description: `${shortAddress} • $${formatted.toFixed(2)} USDC`,
+              icon: '🔷',
+            });
+          }
+        })
+        .catch(err => console.error('Failed to fetch USDC balance:', err));
+    } else if (!appKitConnected && walletRef.current.ethereumAddress && !walletRef.current.stacksAddress) {
+      // AppKit disconnected and no Stacks - reset
+      setWallet(initialWalletState);
+    } else if (!appKitConnected && walletRef.current.ethereumAddress) {
+      // AppKit disconnected but Stacks still connected - just clear ETH
+      setWallet(prev => ({
+        ...prev,
+        ethereumAddress: null,
+        usdcBalance: 0,
+        isConnected: !!prev.stacksAddress,
+      }));
+    }
+  }, [appKitConnected, appKitAddress, network]);
 
   // Helper function to convert BridgeTransaction to Transaction format
   const convertBridgeTransactions = (bridgeTxs: BridgeTransaction[]): Transaction[] => {
@@ -231,8 +300,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         usdcxBalance: usdcxFormatted,
       });
 
-      toast.success('Both wallets connected', {
-        description: `USDC: $${usdcFormatted.toFixed(2)} | USDCx: $${usdcxFormatted.toFixed(2)}`,
+      toast.success('Both wallets connected! 🎉', {
+        description: `ETH: $${usdcFormatted.toFixed(2)} USDC • STX: $${usdcxFormatted.toFixed(2)} USDCx`,
       });
     } catch (error: any) {
       console.error('Wallet connection failed:', error);
@@ -252,16 +321,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const stacksAddress = stacksResult.address;
 
       const usdcxBalance = await fetchUSDCxBalance(stacksAddress, network).catch(() => BigInt(0));
+      const usdcxFormatted = Number(usdcxBalance) / 1_000_000;
 
       setWallet(prev => ({
         ...prev,
         isConnected: true,
         stacksAddress,
-        usdcxBalance: Number(usdcxBalance) / 1_000_000,
+        usdcxBalance: usdcxFormatted,
       }));
 
+      const shortAddress = `${stacksAddress.slice(0, 6)}...${stacksAddress.slice(-4)}`;
       toast.success('Stacks wallet connected', {
-        description: `Address: ${stacksAddress.slice(0, 8)}...${stacksAddress.slice(-6)}`,
+        description: `${shortAddress} • $${usdcxFormatted.toFixed(2)} USDCx`,
+        icon: '🟠',
       });
     } catch (error: any) {
       toast.error('Connection failed', {
@@ -292,6 +364,51 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     } catch (error: any) {
       toast.error('Connection failed', {
         description: error.message || 'Failed to connect Ethereum wallet',
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [network]);
+
+  const connectEthereumWithWallet = useCallback(async (walletId: string) => {
+    setIsConnecting(true);
+    
+    try {
+      const ethereumAddress = await connectSpecificWallet(walletId, network);
+
+      // Update wallet state immediately for fast UX
+      setWallet(prev => ({
+        ...prev,
+        isConnected: true,
+        ethereumAddress,
+      }));
+
+      const walletNames: Record<string, string> = {
+        metamask: 'MetaMask',
+        coinbase: 'Coinbase Wallet',
+        okx: 'OKX Wallet',
+        trust: 'Trust Wallet',
+        rabby: 'Rabby Wallet',
+        brave: 'Brave Wallet',
+      };
+
+      toast.success(`${walletNames[walletId] || 'Wallet'} connected`, {
+        description: `Address: ${ethereumAddress.slice(0, 8)}...${ethereumAddress.slice(-6)}`,
+      });
+
+      // Fetch balance in background (don't block the connection)
+      fetchUSDCBalance(ethereumAddress, network)
+        .then(usdcBalance => {
+          setWallet(prev => ({
+            ...prev,
+            usdcBalance: Number(usdcBalance) / 1_000_000,
+          }));
+        })
+        .catch(console.error);
+        
+    } catch (error: any) {
+      toast.error('Connection failed', {
+        description: error.message || 'Failed to connect wallet',
       });
     } finally {
       setIsConnecting(false);
@@ -329,11 +446,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [network]);
 
   const disconnectWallet = useCallback(() => {
+    // Disconnect from AppKit (Ethereum)
+    disconnectAppKit();
+    // Disconnect from Stacks
     disconnectStacksWallet();
+    // Also disconnect old Ethereum method
     disconnectEthereumWallet();
     setWallet(initialWalletState);
     toast.info('Wallet disconnected');
-  }, []);
+  }, [disconnectAppKit]);
 
   const addTransaction = useCallback((tx: Omit<Transaction, 'id' | 'timestamp'>) => {
     const newTx: Transaction = {
@@ -435,6 +556,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         connectWallet,
         connectStacksOnly,
         connectEthereumOnly,
+        connectEthereumWithWallet,
         disconnectWallet,
         addTransaction,
         updateBalance,
