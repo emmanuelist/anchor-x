@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { GlowCard } from '@/components/ui/GlowCard';
 import { ChainIcon } from '@/components/ui/ChainIcon';
@@ -10,10 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useWallet } from '@/contexts/WalletContext';
 import { formatAmount, getTimeAgo, getExplorerUrl } from '@/lib/data';
-import { Search, ArrowRight, ExternalLink, ChevronDown } from 'lucide-react';
+import { syncFromBlockchain } from '@/lib/bridge';
+import { Search, ArrowRight, ExternalLink, ChevronDown, RefreshCw, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { usePageMeta } from '@/hooks/usePageMeta';
+import { toast } from 'sonner';
 
 type Filter = 'all' | 'deposit' | 'withdraw';
 type StatusFilter = 'all' | 'pending' | 'confirming' | 'completed' | 'failed';
@@ -25,18 +27,48 @@ export default function Transactions() {
     canonicalPath: '/transactions',
   });
 
-  const { transactions } = useWallet();
+  const { transactions, wallet, refreshTransactions } = useWallet();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<Filter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Get wallet addresses
+  const ethAddress = wallet.ethereumAddress;
+  const stxAddress = wallet.stacksAddress;
 
   // Simulate loading state
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 1000);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleSyncFromBlockchain = useCallback(async () => {
+    if (!ethAddress && !stxAddress) {
+      toast.error('Connect a wallet to sync transactions');
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const result = await syncFromBlockchain(ethAddress, stxAddress, 'testnet');
+      
+      if (result.synced > 0) {
+        toast.success(`Synced ${result.synced} transaction${result.synced !== 1 ? 's' : ''} from blockchain`);
+        // Refresh transactions list
+        refreshTransactions?.();
+      } else {
+        toast.info('No new transactions found on blockchain');
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      toast.error('Failed to sync from blockchain');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [ethAddress, stxAddress, refreshTransactions]);
 
   const filtered = transactions.filter((tx) => {
     if (typeFilter !== 'all' && tx.type !== typeFilter) return false;
@@ -70,7 +102,27 @@ export default function Transactions() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 sm:mb-6">Transactions</h1>
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Transactions</h1>
+            <button
+              onClick={handleSyncFromBlockchain}
+              disabled={isSyncing || (!ethAddress && !stxAddress)}
+              className={cn(
+                'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all',
+                'bg-surface-2 hover:bg-surface-3 text-muted-foreground hover:text-foreground',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+              )}
+              title="Sync transaction history from blockchain"
+            >
+              {isSyncing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync from Blockchain'}</span>
+            </button>
+          </div>
 
           {/* Filters */}
           <div className="flex flex-col gap-3 mb-4 sm:mb-6" role="search" aria-label="Transaction filters">
