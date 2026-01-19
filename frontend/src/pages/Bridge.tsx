@@ -24,6 +24,8 @@ import {
   executeWithdraw,
   saveBridgeTransaction,
   getMinWithdrawAmount,
+  fetchRealGasFee,
+  fetchStacksGasFee,
   type DepositProgress,
   type WithdrawProgress,
   type BridgeTransaction,
@@ -198,7 +200,18 @@ export default function Bridge() {
 
           setLastTxHash(result.depositTxHash);
           
-          // Create transaction record
+          // Fetch real gas fee from the transaction (async, don't block)
+          let realGasFee = feeStructure.estimatedGasFee[fromChain]; // Default fallback
+          try {
+            const fetchedGas = await fetchRealGasFee(result.depositTxHash, network);
+            if (fetchedGas > 0) {
+              realGasFee = fetchedGas;
+            }
+          } catch (e) {
+            console.warn('Could not fetch real gas fee, using estimate');
+          }
+          
+          // Create transaction record with real gas fee
           const txRecord: BridgeTransaction = {
             id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             direction: 'deposit',
@@ -210,12 +223,13 @@ export default function Bridge() {
             sourceTxHash: result.depositTxHash,
             timestamp: Date.now(),
             network: network,
+            gasFeeUsd: realGasFee,
           };
           
           // Save to localStorage for persistence
           saveBridgeTransaction(txRecord);
           
-          // Add to context state
+          // Add to context state with real gas fee
           addTransaction({
             type: 'deposit',
             amount: numAmount,
@@ -228,7 +242,7 @@ export default function Bridge() {
             confirmations: 12,
             requiredConfirmations: 12,
             fee: numAmount * 0.0025,
-            gasFee: feeStructure.estimatedGasFee[fromChain],
+            gasFee: realGasFee,
           });
 
         } else {
@@ -272,7 +286,18 @@ export default function Bridge() {
 
           setLastTxHash(result.txId);
 
-          // Create transaction record for withdraw
+          // Fetch real gas fee from Stacks transaction (async)
+          let realGasFee = feeStructure.estimatedGasFee[fromChain]; // Default fallback
+          try {
+            const fetchedGas = await fetchStacksGasFee(result.txId, network);
+            if (fetchedGas > 0) {
+              realGasFee = fetchedGas;
+            }
+          } catch (e) {
+            console.warn('Could not fetch real Stacks gas fee, using estimate');
+          }
+
+          // Create transaction record for withdraw with real gas fee
           const withdrawTxRecord: BridgeTransaction = {
             id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             direction: 'withdraw',
@@ -284,12 +309,13 @@ export default function Bridge() {
             sourceTxHash: result.txId,
             timestamp: Date.now(),
             network: network,
+            gasFeeUsd: realGasFee,
           };
           
           // Save to localStorage for persistence
           saveBridgeTransaction(withdrawTxRecord);
 
-          // Add transaction record to context
+          // Add transaction record to context with real gas fee
           addTransaction({
             type: 'withdraw',
             amount: numAmount,
@@ -302,7 +328,7 @@ export default function Bridge() {
             confirmations: 6,
             requiredConfirmations: 6,
             fee: numAmount * 0.0025,
-            gasFee: feeStructure.estimatedGasFee[fromChain],
+            gasFee: realGasFee,
           });
         }
 

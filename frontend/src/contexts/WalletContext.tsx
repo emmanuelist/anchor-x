@@ -25,7 +25,7 @@ import {
   getConnectedEthereumAddress,
 } from '@/lib/ethereum/wallet';
 
-import { getBridgeTransactions, syncTransactionStatuses, type BridgeTransaction } from '@/lib/bridge';
+import { getBridgeTransactions, syncTransactionStatuses, backfillGasFees, type BridgeTransaction } from '@/lib/bridge';
 import type { NetworkEnvironment } from '@/lib/constants/contracts';
 
 interface WalletContextType {
@@ -72,21 +72,44 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       confirmations: tx.status === 'completed' ? 12 : 0,
       requiredConfirmations: tx.direction === 'deposit' ? 12 : 6,
       fee: parseFloat(tx.amount) * 0.0025,
-      gasFee: tx.direction === 'deposit' ? 5.50 : 0.10,
+      // Use real gas fee from transaction if available, otherwise use fallback estimate
+      gasFee: tx.gasFeeUsd ?? (tx.direction === 'deposit' ? 5.50 : 0.10),
     }));
   };
 
   // Load transactions from local storage on mount and sync statuses
   useEffect(() => {
+    let isMounted = true;
+    let hasBackfilled = false;
+    
     const loadAndSyncTransactions = async () => {
       // First load from localStorage
       const bridgeTxs = getBridgeTransactions();
-      setTransactions(convertBridgeTransactions(bridgeTxs));
+      if (isMounted) {
+        setTransactions(convertBridgeTransactions(bridgeTxs));
+      }
+      
+      // Backfill gas fees for transactions that don't have them (async, non-blocking)
+      // Only do this once per mount
+      if (!hasBackfilled) {
+        hasBackfilled = true;
+        backfillGasFees().then(() => {
+          if (isMounted) {
+            // Reload transactions after backfill
+            const updatedTxs = getBridgeTransactions();
+            setTransactions(convertBridgeTransactions(updatedTxs));
+          }
+        }).catch(err => {
+          console.warn('Could not backfill gas fees:', err);
+        });
+      }
       
       // Then sync statuses with blockchain (async)
       try {
         const syncedTxs = await syncTransactionStatuses();
-        setTransactions(convertBridgeTransactions(syncedTxs));
+        if (isMounted) {
+          setTransactions(convertBridgeTransactions(syncedTxs));
+        }
       } catch (error) {
         console.error('Error syncing transaction statuses:', error);
       }
@@ -99,15 +122,21 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     
     // Set up periodic sync every 30 seconds for pending transactions
     const syncInterval = setInterval(async () => {
+      if (!isMounted) return;
       try {
         const syncedTxs = await syncTransactionStatuses();
-        setTransactions(convertBridgeTransactions(syncedTxs));
+        if (isMounted) {
+          setTransactions(convertBridgeTransactions(syncedTxs));
+        }
       } catch (error) {
         console.error('Error syncing transaction statuses:', error);
       }
     }, 30000);
     
-    return () => clearInterval(syncInterval);
+    return () => {
+      isMounted = false;
+      clearInterval(syncInterval);
+    };
   }, []);
 
   const checkExistingConnections = async () => {
@@ -325,6 +354,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const refreshTransactions = useCallback(async () => {
     try {
+      // First reload from localStorage (in case new txs were added by syncFromBlockchain)
+      const bridgeTxs = getBridgeTransactions();
+      setTransactions(convertBridgeTransactions(bridgeTxs));
+      
+      // Then sync statuses with blockchain
       const syncedTxs = await syncTransactionStatuses();
       setTransactions(convertBridgeTransactions(syncedTxs));
     } catch (error) {

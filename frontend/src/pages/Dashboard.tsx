@@ -8,12 +8,12 @@ import { TokenIcon } from '@/components/ui/TokenIcon';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { AnimatedCounter } from '@/components/ui/AnimatedCounter';
 import { AddressDisplay } from '@/components/ui/AddressDisplay';
-import { Sparkline } from '@/components/ui/Sparkline';
+
 import { PortfolioChart } from '@/components/ui/PortfolioChart';
 import { DashboardSkeleton } from '@/components/ui/DashboardSkeleton';
 import { useWallet } from '@/contexts/WalletContext';
 import { formatAmount, getTimeAgo, fetchNetworkStatus, type NetworkStatus } from '@/lib/data';
-import { ArrowUpRight, ArrowDownLeft, Wallet, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Wallet, ArrowRight, Activity, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { usePageMeta } from '@/hooks/usePageMeta';
 
@@ -28,12 +28,9 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [networkStatus, setNetworkStatus] = useState<NetworkStatus[]>([]);
   
-  // Generate sparkline data from balance history (simulated from current balance)
-  // In production, this would come from historical balance tracking
-  const [sparklineData, setSparklineData] = useState({
-    usdc: [100, 100, 100, 100, 100, 100, 100, 100],
-    usdcx: [100, 100, 100, 100, 100, 100, 100, 100],
-  });
+  // Get network status for each chain
+  const ethereumStatus = networkStatus.find(n => n.name === 'Ethereum');
+  const stacksStatus = networkStatus.find(n => n.name === 'Stacks');
 
   // Fetch network status
   useEffect(() => {
@@ -50,18 +47,11 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Update sparkline data when balance changes
-  useEffect(() => {
-    if (wallet.isConnected) {
-      // Create sparkline based on current balance (normalized to show variation)
-      const baseUsdc = wallet.usdcBalance || 100;
-      const baseUsdcx = wallet.usdcxBalance || 100;
-      setSparklineData({
-        usdc: Array(8).fill(0).map((_, i) => baseUsdc * (0.95 + Math.random() * 0.1)),
-        usdcx: Array(8).fill(0).map((_, i) => baseUsdcx * (0.95 + Math.random() * 0.1)),
-      });
-    }
-  }, [wallet.usdcBalance, wallet.usdcxBalance, wallet.isConnected]);
+  // Helper to format latency display
+  const formatLatency = (latency?: number) => {
+    if (!latency) return 'N/A';
+    return latency < 1000 ? `${latency}ms` : `${(latency / 1000).toFixed(1)}s`;
+  };
 
   // Simulate loading state
   useEffect(() => {
@@ -77,13 +67,12 @@ export default function Dashboard() {
     tx.fromAddress === wallet.ethereumAddress || tx.fromAddress === wallet.stacksAddress
   ).slice(0, 5);
 
-  // Calculate percentage change from first to last value in sparkline
-  const calculateChange = (data: number[]) => {
-    if (data.length < 2 || data[0] === 0) return 0;
-    return ((data[data.length - 1] - data[0]) / data[0]) * 100;
+  // Get status color class
+  const getStatusColor = (status?: string) => {
+    if (status === 'operational') return 'text-success';
+    if (status === 'degraded') return 'text-warning';
+    return 'text-destructive';
   };
-  const usdcChange = calculateChange(sparklineData.usdc);
-  const usdcxChange = calculateChange(sparklineData.usdcx);
 
   if (!wallet.isConnected) {
     return (
@@ -157,15 +146,13 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <Sparkline 
-                      data={sparklineData.usdc} 
-                      color="ethereum" 
-                      width={80} 
-                      height={32} 
-                    />
-                    <div className={`flex items-center justify-end gap-1 text-xs mt-1 ${usdcChange >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {usdcChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                      <span>{Math.abs(usdcChange).toFixed(1)}%</span>
+                    <div className={`flex items-center justify-end gap-1.5 text-xs ${getStatusColor(ethereumStatus?.status)}`}>
+                      <Activity className="h-3.5 w-3.5" />
+                      <span className="capitalize">{ethereumStatus?.status || 'checking...'}</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground mt-1">
+                      <Clock className="h-3 w-3" />
+                      <span>{formatLatency(ethereumStatus?.latency)}</span>
                     </div>
                   </div>
                 </div>
@@ -197,15 +184,13 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <Sparkline 
-                      data={sparklineData.usdcx} 
-                      color="stacks" 
-                      width={80} 
-                      height={32} 
-                    />
-                    <div className={`flex items-center justify-end gap-1 text-xs mt-1 ${usdcxChange >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {usdcxChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                      <span>{Math.abs(usdcxChange).toFixed(1)}%</span>
+                    <div className={`flex items-center justify-end gap-1.5 text-xs ${getStatusColor(stacksStatus?.status)}`}>
+                      <Activity className="h-3.5 w-3.5" />
+                      <span className="capitalize">{stacksStatus?.status || 'checking...'}</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground mt-1">
+                      <Clock className="h-3 w-3" />
+                      <span>{formatLatency(stacksStatus?.latency)}</span>
                     </div>
                   </div>
                 </div>
