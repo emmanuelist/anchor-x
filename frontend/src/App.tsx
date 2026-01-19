@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Bridge from "./pages/Bridge";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
+import Transfer from "./pages/Transfer";
 import HowItWorks from "./pages/HowItWorks";
 import FAQ from "./pages/FAQ";
 import NotFound from "./pages/NotFound";
@@ -30,6 +31,7 @@ const App = () => (
                 <Route path="/bridge" element={<Bridge />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/transactions" element={<Transactions />} />
+                <Route path="/transfer" element={<Transfer />} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="*" element={<NotFound />} />
