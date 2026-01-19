@@ -21,6 +21,7 @@ import type { NetworkEnvironment } from '@/lib/constants/contracts';
 const primaryLinks = [
   { path: '/', label: 'Home' },
   { path: '/bridge', label: 'Bridge' },
+  { path: '/transfer', label: 'Transfer' },
   { path: '/dashboard', label: 'Dashboard' },
 ];
 
@@ -260,39 +261,106 @@ const WalletDropdown = memo(function WalletDropdown({
   );
 });
 
+// Memoized "More" dropdown to prevent infinite update loops
+interface MoreDropdownProps {
+  currentPath: string;
+}
+
+const MoreDropdown = memo(function MoreDropdown({ currentPath }: MoreDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const isSecondaryActive = secondaryLinks.some(link => link.path === currentPath);
+
+  return (
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'px-3 py-2 text-sm font-medium transition-all duration-200',
+            isSecondaryActive
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+            isOpen && 'text-foreground bg-muted/50 shadow-glow-sm ring-1 ring-primary/30'
+          )}
+        >
+          More
+          <ChevronDown 
+            className={cn(
+              "ml-1 h-4 w-4 transition-transform duration-200",
+              isOpen && "rotate-180"
+            )} 
+            aria-hidden="true" 
+          />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48 bg-popover border-border">
+        {secondaryLinks.map((link) => {
+          const isActive = currentPath === link.path;
+          return (
+            <DropdownMenuItem key={link.path} asChild>
+              <Link
+                to={link.path}
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  'w-full cursor-pointer',
+                  isActive && 'bg-primary/10 text-primary'
+                )}
+              >
+                {link.label}
+              </Link>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
 export function Header() {
   const location = useLocation();
   const { wallet, isConnecting, connectWallet, disconnectWallet, network } = useWallet();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [moreDropdownOpen, setMoreDropdownOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 glass-strong" role="banner">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
+          {/* Logo + Badge Pattern (inspired by Stacks Bridge) */}
           <Link 
             to="/" 
-            className="flex items-center gap-2" 
+            className="flex items-center gap-3" 
             data-onboarding="logo"
             aria-label="AnchorX - Go to homepage"
           >
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25" aria-hidden="true">
-              <svg viewBox="0 0 32 32" className="w-6 h-6" fill="none">
-                {/* Ethereum-inspired diamond top */}
-                <path d="M16 3 L22 12 L16 16 L10 12 Z" fill="white" opacity="0.9"/>
-                <path d="M16 16 L22 12 L16 10 L10 12 Z" fill="white" opacity="0.6"/>
-                {/* Stacks-inspired X bridge at bottom */}
-                <path d="M8 20 L24 20" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-                <path d="M6 25 L26 25" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-                {/* Connecting pillars */}
-                <path d="M11 20 L9 25" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
-                <path d="M21 20 L23 25" stroke="white" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
-                {/* Center bridge beam */}
-                <path d="M16 16 L16 20" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
+            <div className="flex items-center gap-2">
+              {/* Logo Icon */}
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md" aria-hidden="true">
+                <svg viewBox="0 0 32 32" className="w-5 h-5" fill="none">
+                  {/* Ethereum diamond */}
+                  <path d="M16 4 L21 11 L16 14 L11 11 Z" fill="white" opacity="0.95"/>
+                  <path d="M16 14 L21 11 L16 9 L11 11 Z" fill="white" opacity="0.6"/>
+                  {/* Stacks bars */}
+                  <path d="M9 18 L23 18" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                  <path d="M7 23 L25 23" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                  {/* Bridge pillars */}
+                  <path d="M12 18 L10 23" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.7"/>
+                  <path d="M20 18 L22 23" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.7"/>
+                  {/* Center connection */}
+                  <path d="M16 14 L16 18" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+              {/* Brand Name */}
+              <span className="text-lg font-semibold text-foreground">AnchorX</span>
             </div>
-            <span className="text-xl font-bold gradient-text">AnchorX</span>
+            {/* Bridge Badge */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20">
+              <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 text-primary" fill="currentColor">
+                <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M5 8 L7 10 L11 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              </svg>
+              <span className="text-xs font-medium text-primary">Bridge</span>
+            </div>
           </Link>
 
           {/* Tablet Nav (md to lg) - Shows primary links + More dropdown */}
@@ -321,48 +389,7 @@ export function Header() {
             })}
             
             {/* More dropdown for secondary links */}
-            <DropdownMenu open={moreDropdownOpen} onOpenChange={setMoreDropdownOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    'px-3 py-2 text-sm font-medium transition-all duration-200',
-                    secondaryLinks.some(link => link.path === location.pathname)
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-                    moreDropdownOpen && 'text-foreground bg-muted/50 shadow-glow-sm ring-1 ring-primary/30'
-                  )}
-                >
-                  More
-                  <ChevronDown 
-                    className={cn(
-                      "ml-1 h-4 w-4 transition-transform duration-200",
-                      moreDropdownOpen && "rotate-180"
-                    )} 
-                    aria-hidden="true" 
-                  />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-popover border-border">
-                {secondaryLinks.map((link) => {
-                  const isActive = location.pathname === link.path;
-                  return (
-                    <DropdownMenuItem key={link.path} asChild>
-                      <Link
-                        to={link.path}
-                        className={cn(
-                          'w-full cursor-pointer',
-                          isActive && 'bg-primary/10 text-primary'
-                        )}
-                      >
-                        {link.label}
-                      </Link>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <MoreDropdown currentPath={location.pathname} />
           </nav>
 
           {/* Desktop Nav (lg and up) - Shows all links */}
