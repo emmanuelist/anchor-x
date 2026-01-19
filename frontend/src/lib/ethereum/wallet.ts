@@ -82,6 +82,147 @@ export async function createEthereumWalletClient(
 // Storage key for persisting connection preference
 const ETH_CONNECTED_KEY = 'anchorx_eth_connected';
 const ETH_ADDRESS_KEY = 'anchorx_eth_address';
+const ETH_WALLET_TYPE_KEY = 'anchorx_eth_wallet_type';
+
+/**
+ * Get the appropriate Ethereum provider for a specific wallet
+ * Handles multi-wallet environments where multiple extensions are installed
+ */
+export function getProviderForWallet(walletId: string): any {
+  if (typeof window === 'undefined') return null;
+  
+  const ethereum = window.ethereum as any;
+  const okxWallet = (window as any).okxwallet;
+
+  // OKX wallet has its own global provider
+  if (walletId === 'okx') {
+    if (okxWallet) return okxWallet;
+    if (ethereum?.isOkxWallet || ethereum?.isOKExWallet) return ethereum;
+    // Check providers array
+    if (ethereum?.providers) {
+      const okxProvider = ethereum.providers.find((p: any) => p.isOkxWallet || p.isOKExWallet);
+      if (okxProvider) return okxProvider;
+    }
+    return null;
+  }
+
+  if (!ethereum) return null;
+
+  // Handle multiple injected providers (when multiple wallets installed)
+  if (ethereum.providers && Array.isArray(ethereum.providers)) {
+    for (const provider of ethereum.providers) {
+      // MetaMask - ensure it's real MetaMask, not Brave/Rabby impersonating
+      if (walletId === 'metamask' && provider.isMetaMask && !provider.isBraveWallet && !provider.isRabby && !provider.isOkxWallet) {
+        return provider;
+      }
+      if (walletId === 'coinbase' && provider.isCoinbaseWallet) return provider;
+      if (walletId === 'trust' && provider.isTrust) return provider;
+      if (walletId === 'rabby' && provider.isRabby) return provider;
+      if (walletId === 'brave' && provider.isBraveWallet) return provider;
+    }
+  }
+
+  // Single provider detection
+  if (walletId === 'metamask' && ethereum.isMetaMask && !ethereum.isBraveWallet && !ethereum.isRabby && !ethereum.isOkxWallet) {
+    return ethereum;
+  }
+  if (walletId === 'coinbase' && ethereum.isCoinbaseWallet) return ethereum;
+  if (walletId === 'trust' && ethereum.isTrust) return ethereum;
+  if (walletId === 'rabby' && ethereum.isRabby) return ethereum;
+  if (walletId === 'brave' && ethereum.isBraveWallet) return ethereum;
+
+  // If wallet not specifically detected but ethereum is available, return it as fallback
+  // This helps with wallets that don't set unique flags
+  return ethereum;
+}
+
+/**
+ * Connect to a specific Ethereum wallet
+ * The wallet selection is done in our UI modal, so we just connect directly
+ * @param walletId - The wallet to connect to (metamask, coinbase, trust, okx, etc.)
+ * @param network - Network to connect to
+ */
+export async function connectSpecificWallet(
+  walletId: string,
+  network: NetworkEnvironment = 'testnet'
+): Promise<`0x${string}`> {
+  const provider = getProviderForWallet(walletId);
+  
+  if (!provider) {
+    throw new Error(`${walletId} wallet not detected. Please install the wallet extension.`);
+  }
+
+  try {
+    // Connect directly to the selected wallet
+    // Our modal already handles wallet selection, so no need for wallet_requestPermissions
+    const accounts = await provider.request({
+      method: 'eth_requestAccounts',
+    }) as string[];
+    
+    if (!accounts || accounts.length === 0) {
+      throw new Error('No accounts returned from wallet');
+    }
+
+    const address = accounts[0] as `0x${string}`;
+
+    // Save connection state
+    localStorage.setItem(ETH_CONNECTED_KEY, 'true');
+    localStorage.setItem(ETH_ADDRESS_KEY, address);
+    localStorage.setItem(ETH_WALLET_TYPE_KEY, walletId);
+
+    // Switch to correct network
+    const targetChainId = NETWORK_CONFIG[network].ethereum.chainId;
+    
+    try {
+      const currentChainId = await provider.request({
+        method: 'eth_chainId',
+      }) as string;
+
+      if (parseInt(currentChainId, 16) !== targetChainId) {
+        await provider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: `0x${targetChainId.toString(16)}` }],
+        });
+      }
+    } catch (switchError: any) {
+      if (switchError.code === 4902) {
+        const chainConfig = network === 'mainnet' ? {
+          chainId: `0x${targetChainId.toString(16)}`,
+          chainName: 'Ethereum Mainnet',
+          nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+          rpcUrls: ['https://ethereum.publicnode.com'],
+          blockExplorerUrls: ['https://etherscan.io'],
+        } : {
+          chainId: `0x${targetChainId.toString(16)}`,
+          chainName: 'Sepolia Testnet',
+          nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 },
+          rpcUrls: ['https://ethereum-sepolia.publicnode.com'],
+          blockExplorerUrls: ['https://sepolia.etherscan.io'],
+        };
+        
+        await provider.request({
+          method: 'wallet_addEthereumChain',
+          params: [chainConfig],
+        });
+      }
+    }
+
+    return address;
+  } catch (error: any) {
+    if (error.code === 4001) {
+      throw new Error('User rejected wallet connection');
+    }
+    throw error;
+  }
+}
+
+/**
+ * Get the last connected wallet type
+ */
+export function getLastConnectedWallet(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(ETH_WALLET_TYPE_KEY);
+}
 
 /**
  * Request connection to Ethereum wallet (MetaMask, etc.)
@@ -239,6 +380,7 @@ export function isEthereumWalletConnected(): boolean {
 export function disconnectEthereumWallet(): void {
   localStorage.removeItem(ETH_CONNECTED_KEY);
   localStorage.removeItem(ETH_ADDRESS_KEY);
+  localStorage.removeItem(ETH_WALLET_TYPE_KEY);
 }
 
 /**
