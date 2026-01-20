@@ -436,7 +436,7 @@ VITE_STACKS_API_URL=https://api.testnet.hiro.so
 </td>
 <td align="center" width="33%">
 
-<img src="assets/screenshots/stacks-logo.jpg" width="32"/>
+<img src="https://cryptologos.cc/logos/stacks-stx-logo.png" width="32"/>
 
 **Testnet STX**
 
@@ -1098,7 +1098,7 @@ frontend/
 <br/>✅ Full Support
 </td>
 <td align="center" width="33%">
-<img src="assets/screenshots/stacks-logo.jpg" width="48"/>
+<img src="https://cryptologos.cc/logos/stacks-stx-logo.png" width="48"/>
 <br/><b>Other SIP-010</b>
 <br/>✅ Compatible
 </td>
