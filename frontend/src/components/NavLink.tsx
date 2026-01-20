@@ -6,6 +6,8 @@ interface NavLinkCompatProps extends Omit<NavLinkProps, "className"> {
   className?: string;
   activeClassName?: string;
   pendingClassName?: string;
+    exact?: boolean; // For exact path matching
+  end?: boolean;   // React Router v6 end prop
 }
 
 const NavLink = forwardRef<HTMLAnchorElement, NavLinkCompatProps>(
