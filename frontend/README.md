@@ -6,7 +6,7 @@
 <br/>
 
 <!-- Typing Animation -->
-<a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&duration=3000&pause=1000&color=6366F1&center=true&vCenter=true&multiline=true&repeat=true&width=600&height=100&lines=Bridge+USDC+in+Under+15+Minutes+⚡;Circle's+xReserve+Protocol+🛡️;99.9%25+Transaction+Success+Rate+✅" alt="Typing SVG" /></a>
+<a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&duration=3000&pause=1000&color=6366F1&center=true&vCenter=true&repeat=true&width=650&height=60&lines=Bridge+USDC+in+Under+15+Minutes;Circles+xReserve+Protocol;99.9%25+Transaction+Success+Rate;Bitcoin-Secured+DeFi+Bridge" alt="Typing SVG" /></a>
 
 <br/>
 <br/>
