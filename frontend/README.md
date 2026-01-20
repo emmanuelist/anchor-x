@@ -1070,7 +1070,7 @@ frontend/
 <br/>✅ Full Support
 </td>
 <td align="center" width="20%">
-<img src="https://trustwallet.com/assets/images/media/assets/trust_platform.svg" width="48"/>
+<img src="https://github.com/Aero25x/Cryptocurrencies-Logo/blob/main/trustwallet.svg" width="48"/>
 <br/><b>Trust Wallet</b>
 <br/>✅ Via WC
 </td>
@@ -1088,12 +1088,12 @@ frontend/
 <table>
 <tr>
 <td align="center" width="33%">
-<img src="https://leather.io/leather-logo-mark.svg" width="48"/>
+<img src="https://lh3.googleusercontent.com/L2-6RY-R0J7MfguWZugMMEupyf60d9nY7tGT-vdJbKuxIVEEh0Kqu-5_G61hC47N5klx0p9196JCmS81dmJOA5OTIw=s120" width="48"/>
 <br/><b>Leather</b>
 <br/>✅ Full Support
 </td>
 <td align="center" width="33%">
-<img src="https://www.xverse.app/assets/favicon-32x32.png" width="48"/>
+<img src="https://lh3.googleusercontent.com/Y-j4EbvbfD7pGCDm2hL_GLKk9zFhQs5Byr38Kyeq0OYmjbvt6HR-jsv1g4UBUdSLUGZ6eb-doYpxkk8BjS_ASBF3lA=s120" width="48"/>
 <br/><b>Xverse</b>
 <br/>✅ Full Support
 </td>
