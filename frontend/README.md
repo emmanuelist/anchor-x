@@ -866,7 +866,7 @@ const ANCHORX_PROTOCOL = {
 <br><sub><b>Tailwind</b></sub>
 </td>
 <td align="center" width="14%">
-<img src="https://www.framer.com/images/favicons/favicon.png" width="48" height="48" alt="Framer" />
+<img src="assets/screenshots/framer-motion.png" width="48" height="48" alt="Framer" />
 <br><sub><b>Framer Motion</b></sub>
 </td>
 <td align="center" width="14%">
@@ -1176,25 +1176,10 @@ npm i -g vercel
 vercel --prod
 ```
 
-### Docker
-
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-EXPOSE 8080
-CMD ["npm", "run", "preview"]
-```
-
 ### Environment Variables (Production)
 
 ```env
 VITE_WALLETCONNECT_PROJECT_ID=your_production_project_id
-VITE_ETHEREUM_RPC_URL=https://mainnet.infura.io/v3/YOUR_KEY
-VITE_STACKS_API_URL=https://api.mainnet.hiro.so
 ```
 
 ---
