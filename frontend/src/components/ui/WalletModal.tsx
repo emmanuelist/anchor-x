@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Loader2, ExternalLink, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import stacksLogo from '@/assets/stacks-logo.jpg';
 
 // Inline SVG wallet icons for reliability (no external loading)
 const WalletIcons: Record<string, JSX.Element> = {
@@ -306,7 +307,7 @@ export function WalletModal({
               </div>
             ) : (
               <img 
-                src="/src/assets/stacks-logo.jpg" 
+                src={stacksLogo} 
                 alt="Stacks" 
                 className="w-6 h-6 rounded-full object-cover"
               />

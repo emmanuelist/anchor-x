@@ -98,9 +98,56 @@ export async function executeDeposit(
   }
 
   const chain = network === 'mainnet' ? mainnet : sepolia;
+  const expectedChainId = network === 'mainnet' ? 1 : 11155111; // Mainnet or Sepolia
   const rpcUrl = NETWORK_CONFIG[network].ethereum.rpcUrl;
   const usdcAddress = CONTRACT_ADDRESSES[network].ethereum.usdc as `0x${string}`;
   const xReserveAddress = CONTRACT_ADDRESSES[network].ethereum.xReserve as `0x${string}`;
+
+  // Ensure wallet is on the correct chain before proceeding
+  try {
+    const currentChainId = await window.ethereum.request({
+      method: 'eth_chainId',
+    }) as string;
+    
+    if (parseInt(currentChainId, 16) !== expectedChainId) {
+      console.log(`Switching from chain ${parseInt(currentChainId, 16)} to ${expectedChainId}`);
+      
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: `0x${expectedChainId.toString(16)}` }],
+        });
+      } catch (switchError: any) {
+        // Chain not added to wallet, try to add it
+        if (switchError.code === 4902) {
+          const chainConfig = network === 'mainnet' 
+            ? {
+                chainId: '0x1',
+                chainName: 'Ethereum Mainnet',
+                nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://ethereum.publicnode.com'],
+                blockExplorerUrls: ['https://etherscan.io'],
+              }
+            : {
+                chainId: '0xaa36a7',
+                chainName: 'Sepolia Testnet',
+                nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://ethereum-sepolia.publicnode.com'],
+                blockExplorerUrls: ['https://sepolia.etherscan.io'],
+              };
+          
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [chainConfig],
+          });
+        } else {
+          throw new Error(`Please switch to ${network === 'mainnet' ? 'Ethereum Mainnet' : 'Sepolia Testnet'} in your wallet`);
+        }
+      }
+    }
+  } catch (chainError: any) {
+    throw new Error(`Network switch failed: ${chainError.message || 'Please manually switch to the correct network'}`);
+  }
 
   // Create clients
   const publicClient = createPublicClient({
