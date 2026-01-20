@@ -317,7 +317,7 @@ Optimized for every screen size with touch-friendly controls and mobile wallet d
 
 **🔄 Bridge Flow**
 
-<img src="assets/demo-bridge.gif" alt="Bridge Demo" width="100%" style="border-radius: 8px;"/>
+<img src="assets/screenshots/demo-bridge.png" alt="Bridge Demo" width="100%" style="border-radius: 8px;"/>
 
 *Complete deposit in one click*
 
@@ -326,7 +326,7 @@ Optimized for every screen size with touch-friendly controls and mobile wallet d
 
 **📊 Dashboard**
 
-<img src="assets/demo-dashboard.gif" alt="Dashboard Demo" width="100%" style="border-radius: 8px;"/>
+<img src="assets/screenshots/dashboard.png" alt="Dashboard Demo" width="100%" style="border-radius: 8px;"/>
 
 *Track your cross-chain portfolio*
 
