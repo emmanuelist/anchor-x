@@ -227,12 +227,13 @@ export function isValidStacksAddress(address: string, network: NetworkEnvironmen
   // Testnet addresses start with ST, mainnet with SP
   const prefix = network === 'testnet' ? 'ST' : 'SP';
   
-  // Basic validation
-  if (!address.startsWith(prefix)) return false;
+  // Basic validation - case insensitive prefix check
+  if (!address.toUpperCase().startsWith(prefix)) return false;
   if (address.length < 30 || address.length > 50) return false;
   
-  // Check for valid characters (base58)
-  const validChars = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
+  // Check for valid c32 characters (Stacks uses c32check encoding, not base58)
+  // Valid c32 characters: 0-9, A-H, J-N, P-Z (no I, L, O)
+  const validChars = /^[0123456789ABCDEFGHJKMNPQRSTVWXYZabcdefghjkmnpqrstvwxyz]+$/;
   return validChars.test(address.slice(2));
 }
 
