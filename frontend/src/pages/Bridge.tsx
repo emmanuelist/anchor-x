@@ -410,18 +410,18 @@ export default function Bridge() {
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between flex-wrap gap-1">
                     <span className="text-xs text-muted-foreground">From</span>
-                    {wallet.isConnected && (
-                      <div className="flex flex-col items-end gap-0.5">
+                    <div className="flex flex-col items-end gap-0.5">
+                      {wallet.isConnected && (
                         <span className="text-xs text-muted-foreground">
                           Balance: <span className="font-mono">{formatAmount(balance)}</span> {fromToken.toUpperCase()}
                         </span>
-                        {direction === 'withdraw' && (
-                          <span className="text-[10px] text-amber-500/80">
-                            Min withdrawal: $4.80 USDCx
-                          </span>
-                        )}
-                      </div>
-                    )}
+                      )}
+                      {direction === 'withdraw' && (
+                        <span className="text-[10px] text-amber-500/80">
+                          Min withdrawal: $4.80 USDCx
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <motion.div 
